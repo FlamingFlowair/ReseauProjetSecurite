@@ -7,7 +7,7 @@ int main()
 {
 	int port = 8081;
 
-	while (port < 8080+30){
+	for (; port < 8080+30 ; ++port){
 		try
 		{
 			// Création d'un NoeudThor
@@ -21,7 +21,10 @@ int main()
 		{
 			if (string("bind: Address already in use") == e.what()){
 				std::cerr << e.what() << std::endl;
-				++port;
+			}
+			else {
+				cout << "Exit with error" << std::endl;
+				exit(-1);
 			}
 		}
 	}

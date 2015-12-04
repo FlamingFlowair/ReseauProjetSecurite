@@ -31,15 +31,12 @@ void ServeurCentral::handle_accept(Client<ServeurCentral> *noeud, const boost::s
 	if (!error)
 	{
 		std::cout << "Nouveau Client se connecte !" << std::endl;
-//		sendPortNumberRequest(noeud);
-		sendIpPortAllNodes(noeud);
 
 		cout << "On ajoute le Client à la liste des Clients connus" << std::endl;
 		toutlemonde.push_back(noeud);
 		cout << "On lance la lecture async sur le Client" << std::endl;
 		noeud->startRead();
-		cout << "On relance l'acceptation de nouveau Clients" << std::endl;
-		startAccept(); // (5)
+		startAccept();
 	}
 }
 
@@ -56,7 +53,7 @@ void ServeurCentral::sendIpPortAllNodes(Client<ServeurCentral> *to){
 	}
 	oTextArchive << ipPortEveryBody;    // sérialisation de t
 
-	Trame t(-1, oStringStream.str());
+	Trame t(-2, oStringStream.str());
 	cout << "/*********" << std::endl <<
 			"TTL : " << t.getTTL() << std::endl <<
 			"Commande : " << t.getCommande() << std::endl <<
@@ -72,10 +69,34 @@ void ServeurCentral::sendIpPortAllNodes(Client<ServeurCentral> *to){
 	//boost::asio::write(to->getSocket(), boost::asio::buffer(string("Voici une très longue string pour montrer que le serveur est capable de parler au client")));
 }
 
+void ServeurCentral::sendNbNoeuds(Client<ServeurCentral> *to){
+	cout << "Le serveur central envoie le nombre de noeuds du réseau" << std::endl;
+	list<pair <string, int> > ipPortEveryBody;
+	for(auto cl : this->toutlemonde){
+		Client<ServeurCentral> *cli = cl;
+		if (cli->getPort() != 0)
+			ipPortEveryBody.insert(ipPortEveryBody.end(), pair<string, int>(cli->getIpStr(), cli->getPort()));
+	}
+
+	Trame t(-3, std::to_string(ipPortEveryBody.size()));
+	cout << "/*********" << std::endl <<
+			"TTL : " << t.getTTL() << std::endl <<
+			"Commande : " << t.getCommande() << std::endl <<
+			"*********/" << std::endl;
+	boost::asio::streambuf buf;
+	ostream os(&buf);
+	boost::archive::binary_oarchive archiveBinaire(os);
+	archiveBinaire << t;
+
+	to->send(t);
+}
+
 void ServeurCentral::traitementDeLaTrame(Trame &t, Client<ServeurCentral> *noeudSource)
 {
 	cout << "Traitement de la trame" << std::endl;
 	const int TTL_RENSEIGNE_NO_PORT=-1;
+	const int TTL_ASK_LIST_IP_PORT=-2;
+	const int TTL_ASK_NB_NOEUDS=-3;
 	/*Si le noeud est complété*/
 	if (noeudSource->getPort() == 0){
 		if (t.getTTL() != TTL_RENSEIGNE_NO_PORT){
@@ -87,18 +108,21 @@ void ServeurCentral::traitementDeLaTrame(Trame &t, Client<ServeurCentral> *noeud
 			cout << "Le noeud à renseigné son port" << std::endl;
 		}
 	}
-	/* Sinon */
-	switch (t.getTTL()) {
-		case -2:
-			cout << "Le noeud demande la liste d'ip:portd'écoute" << std::endl;
-			sendIpPortAllNodes(noeudSource);
-			break;
-		case -3:
-			//sendNombreDeConnectesSurLeReseau();
-		default:
-			cout << "Le noeud demande le broadcast d'un message" << std::endl;
-			sendTrameToRecipient(t);
-			break;
+	else {
+		cout << "ELSEEEEEEEEEEEEEEEEEEEEEEEEEEEEE" << std::endl;
+		switch (t.getTTL()) {
+			case TTL_ASK_LIST_IP_PORT:
+				cout << "Le noeud demande la liste d'ip:portd'écoute" << std::endl;
+				sendIpPortAllNodes(noeudSource);
+				break;
+			case TTL_ASK_NB_NOEUDS:
+				sendNbNoeuds(noeudSource);
+				break;
+			default:
+				cout << "Le noeud demande le broadcast d'un message" << std::endl;
+				sendTrameToRecipient(t);
+				break;
+		}
 	}
 }
 
@@ -108,5 +132,17 @@ void ServeurCentral::sendTrameToRecipient(Trame &t)
 	for (auto n : toutlemonde){
 		Client<ServeurCentral>* p = n;
 		p->send(t);
+	}
+}
+
+void ServeurCentral::clientLeave(Client<ServeurCentral> *leaving)
+{
+	auto i = std::begin(this->toutlemonde);
+
+	while (i != std::end(this->toutlemonde)) {
+		if (*i == leaving)
+			i = this->toutlemonde.erase(i);
+		else
+			++i;
 	}
 }

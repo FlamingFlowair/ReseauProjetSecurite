@@ -20,7 +20,7 @@ template<class TObserveur> class Client
 		TObserveur* observeur;
 		tcp::socket socketTcp;
 		int port;
-		boost::array<char, 1024> buffer;
+		boost::array<char, 2048> buffer;
 		friend class boost::serialization::access;
 		template<class Archive> void serialize(Archive& ar, const unsigned int version){
 			if(version){};
@@ -60,7 +60,7 @@ string Client<TObserveur>::getIpStr()
 template<class TObserveur>
 void Client<TObserveur>::startRead()
 {
-	boost::asio::async_read(socketTcp, boost::asio::buffer(buffer),
+	socketTcp.async_read_some(boost::asio::buffer(buffer),
 				boost::bind(&Client::handle_read, this,
 				boost::asio::placeholders::error)
 				);
@@ -86,29 +86,40 @@ void Client<TObserveur>::send(Trame &t)
 	boost::archive::binary_oarchive archiveBinaire(os);
 	archiveBinaire << t;
 
-	boost::asio::write(socketTcp, buf);
+	//boost::asio::send(socketTcp, buf);
+	socketTcp.send(boost::asio::buffer(buf.data()));
+//	startRead();
 }
 
 template<class TObserveur>
 void Client<TObserveur>::handle_read(const boost::system::error_code& error) {
+	cout << "Début handle_read" << std::endl;
 	if (!error)
 	{
-		//std::istringstream istring(buffer);
-		cout << "Pas d'erreur, reconstitution de la trame avant le traitement" << std::endl;
-		Trame t;
-		boost::asio::streambuf buf;
-		istream is(&buf);
-		boost::archive::binary_iarchive archiveBinaire(is);
-		archiveBinaire >> t;
+		try {
+			Trame t;
 
-		observeur->traitementDeLaTrame(t, this);
-		// On réécoute
-		startRead();
+			string reception(buffer.data(), buffer.size());
+			startRead();
+			cout << "On relance l'écoute (le plus vite possible" << std::endl;
+			istringstream is(reception);
+			boost::archive::binary_iarchive archiveBinaire(is);
+			archiveBinaire >> t;
+			observeur->traitementDeLaTrame(t, this);
+
+		}
+		catch (std::exception& e)
+		{
+			std::cerr << e.what() << std::endl;
+		}
 	}
 	else
 	{
+		cout << "CLIENT QUITTE LE SERVEUR" << std::endl;
 		socketTcp.close();
+		observeur->clientLeave(this);
 	}
+	cout << "Fin handle_read" << std::endl;
 }
 
 

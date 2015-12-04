@@ -21,5 +21,9 @@ class NoeudThor
 		NoeudThor(boost::asio::io_service &io_service, int portecoute);
 		void startAccept();
 		void traitementDeLaTrame(Trame &t, Client<NoeudThor> *noeudSource);
+		void askNeighborList();
+		void giveEarPort();
+		void askNombreNoeuds();
+		void clientLeave(Client<NoeudThor>* leaving);
 };
 #endif //NOEUDTHOR_H

@@ -38,6 +38,8 @@ class ServeurCentral
 		void traitementDeLaTrame(Trame& t, Client<ServeurCentral>*noeudSource);
 		void sendTrameToRecipient(Trame& t);
 
+		void sendNbNoeuds(Client<ServeurCentral> *to);
+		void clientLeave(Client<ServeurCentral> *leaving);
 };
 
 
