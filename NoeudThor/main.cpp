@@ -24,6 +24,7 @@ int main()
 			}
 			else {
 				cout << "Exit with error" << std::endl;
+				std::cerr << e.what() << std::endl;
 				exit(-1);
 			}
 		}

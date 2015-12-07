@@ -1,11 +1,13 @@
 #include "noeudthor.h"
 #include <boost/archive/text_iarchive.hpp>
 #include <boost/serialization/map.hpp>
+#include <stdlib.h>
 
-NoeudThor::NoeudThor(boost::asio::io_service &io_service, int portecoute)
+NoeudThor::NoeudThor(boost::asio::io_service &io_service, int portecoute, network_interface *observeur)
 	: portecoute(portecoute),
 	  m_acceptor(io_service, tcp::endpoint(tcp::v4(), portecoute)),
-	  io_service(io_service)
+	  io_service(io_service),
+	  observeur(observeur)
 {
 	cout << "Construction d'un noeudThor" << std::endl;
 	startConnect();
@@ -22,12 +24,11 @@ void NoeudThor::startConnect()
 	tcp::endpoint endpoint(boost::asio::ip::address::from_string("127.0.0.1"), 8080);
 	cout << "Connection au serveur central" << std::endl;
 	noeudServeurCentral->getSocket().connect(endpoint);
-	cout << "Connection effectuée on lance la lecture" << std::endl;
 	noeudServeurCentral->startRead();
 }
 
 void NoeudThor::giveEarPort(){
-	cout << "Le NoeudThor demande la liste d'ip:portd'ecoute des autres noeudsThors / frontales" << std::endl;
+	cout << "Le NoeudThor donne son port d'écoute au serveur." << std::endl;
 	Trame t(-1, std::to_string(portecoute));
 	cout << "/*********" << std::endl <<
 			"TTL : " << t.getTTL() << std::endl <<
@@ -54,9 +55,6 @@ void NoeudThor::askNeighborList(){
 	archiveBinaire << t;
 
 	noeudServeurCentral->send(t);
-	//boost::asio::write(to->getSocket(), buf);
-	//cout << "Write effectué vers le client" << std::endl;
-	//boost::asio::write(to->getSocket(), boost::asio::buffer(string("Voici une très longue string pour montrer que le serveur est capable de parler au client")));
 }
 
 
@@ -77,6 +75,10 @@ void NoeudThor::askNombreNoeuds(){
 
 void NoeudThor::clientLeave(Client<NoeudThor> *leaving)
 {
+	if (leaving == noeudServeurCentral){
+		cout << "Le serveur central s'est arreté" << std::endl;
+		exit(-1);
+	}
 	auto i = std::begin(this->toutlemonde);
 
 	while (i != std::end(this->toutlemonde)) {
@@ -99,13 +101,10 @@ void NoeudThor::startAccept()
 
 void NoeudThor::traitementDeLaTrame(Trame &t, Client<NoeudThor> *noeudSource)
 {
-	cout << "Debut " << __FUNCTION__ << std::endl;
 	if (noeudSource == this->noeudServeurCentral){
-		cout << "If " << __FUNCTION__ << std::endl;
 		switch (t.getTTL()) {
 			case -1:
 			{
-				cout << "Really ?" << std::endl;
 				break;
 			}
 			case -2:
@@ -117,9 +116,25 @@ void NoeudThor::traitementDeLaTrame(Trame &t, Client<NoeudThor> *noeudSource)
 				boost::archive::text_iarchive iTextArchive(iStringStream);
 				iTextArchive >> ipPortEveryBody;
 
+				bool found;
 				for(pair <string, int> trucl : ipPortEveryBody){
-					cout << "IP : " << trucl.first << std::endl <<
-							"Port : " << trucl.second << std::endl;
+					found=false;
+					for (auto it = toutlemonde.begin(); it != toutlemonde.end() && found!=true; it++){
+						if ((*it)->getIpStr() == trucl.first && (*it)->getPort() == trucl.second){
+							cout << "nous somme déjà connectés à ce client (" << trucl.first << ":" << trucl.second << ")" << std::endl;
+							found = true;
+						}
+					}
+					if (found == false){
+						cout << "On était pas connecté donc on se connecte" << std::endl;
+						auto cli = new Client<NoeudThor>(this, io_service);
+						tcp::endpoint endpoint(boost::asio::ip::address::from_string(trucl.first), trucl.second);
+						cli->getSocket().connect(endpoint);
+						cli->startRead();
+						toutlemonde.push_front(cli);
+					}
+					cout << "IT : " << trucl.first << std::endl;
+					cout << "Port : " << trucl.second << std::endl;
 				}
 				cout << "Enregistrement des différents noeuds effectué" << std::endl;
 				break;
@@ -132,17 +147,36 @@ void NoeudThor::traitementDeLaTrame(Trame &t, Client<NoeudThor> *noeudSource)
 				cout << "Il y a " << nombre << "noeuds sur le réseau." << std::endl;
 				break;
 			}
+			case 0:
+			{
+				observeur->tor_recieve(t.getCommande());
+				break;
+			}
 			default:
 			{
-				cout << "On a recu un truc mais un code incohérent" << std::endl;
 				break;
 			}
 		}
 	}
 	else{
-		cout << "Else " << __FUNCTION__ << std::endl;
+		switch (t.getTTL()) {
+			case 0:
+			{
+				noeudServeurCentral->send(t);
+				break;
+			}
+			default:
+			{
+				t.setTTL(t.getTTL()-1);
+				srand(time(NULL));
+				int number = rand()%toutlemonde.size();
+				auto i = toutlemonde.begin();
+				std::advance(i, number);
+				(*i)->send(t);
+				break;
+			}
+		}
 	}
-	cout << "Fin " << __FUNCTION__ << std::endl;
 }
 
 void NoeudThor::handle_accept(Client<NoeudThor> *noeud, const boost::system::error_code &error)
@@ -150,11 +184,8 @@ void NoeudThor::handle_accept(Client<NoeudThor> *noeud, const boost::system::err
 	if (!error)
 	{
 		std::cout << "Nouveau Client se connecte !" << std::endl;
-		cout << "On ajoute le Client à la liste des Clients connus" << std::endl;
 		toutlemonde.push_back(noeud);
-		cout << "On lance la lecture async sur le Client" << std::endl;
 		noeud->startRead();
-		cout << "On relance l'acceptation de nouveau Clients" << std::endl;
 		startAccept(); // (5)
 	}
 }

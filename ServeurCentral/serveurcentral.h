@@ -40,6 +40,7 @@ class ServeurCentral
 
 		void sendNbNoeuds(Client<ServeurCentral> *to);
 		void clientLeave(Client<ServeurCentral> *leaving);
+		void sendNbNoeudsToAll();
 };
 
 

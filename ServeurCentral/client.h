@@ -37,7 +37,6 @@ template<class TObserveur> class Client
 		int getPort() const;
 		void setPort(int value);
 		void send(Trame& t);
-//		void send(const boost::asio::streambuf &buf);
 };
 
 template<class TObserveur> Client<TObserveur>::Client(TObserveur *observeur, boost::asio::io_service &io_service): observeur(observeur), socketTcp(io_service), port(0)
@@ -85,23 +84,17 @@ void Client<TObserveur>::send(Trame &t)
 	ostream os(&buf);
 	boost::archive::binary_oarchive archiveBinaire(os);
 	archiveBinaire << t;
-
-	//boost::asio::send(socketTcp, buf);
 	socketTcp.send(boost::asio::buffer(buf.data()));
-//	startRead();
 }
 
 template<class TObserveur>
 void Client<TObserveur>::handle_read(const boost::system::error_code& error) {
-	cout << "Début handle_read" << std::endl;
 	if (!error)
 	{
 		try {
 			Trame t;
-
 			string reception(buffer.data(), buffer.size());
 			startRead();
-			cout << "On relance l'écoute (le plus vite possible" << std::endl;
 			istringstream is(reception);
 			boost::archive::binary_iarchive archiveBinaire(is);
 			archiveBinaire >> t;
@@ -115,11 +108,9 @@ void Client<TObserveur>::handle_read(const boost::system::error_code& error) {
 	}
 	else
 	{
-		cout << "CLIENT QUITTE LE SERVEUR" << std::endl;
 		socketTcp.close();
 		observeur->clientLeave(this);
 	}
-	cout << "Fin handle_read" << std::endl;
 }
 
 
