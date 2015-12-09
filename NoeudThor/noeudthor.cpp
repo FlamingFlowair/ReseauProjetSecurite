@@ -66,10 +66,6 @@ void NoeudThor::askNombreNoeuds(){
 			"TTL : " << t.getTTL() << std::endl <<
 			"Commande : " << t.getCommande() << std::endl <<
 			"*********/" << std::endl;
-	boost::asio::streambuf buf;
-	ostream os(&buf);
-	boost::archive::binary_oarchive archiveBinaire(os);
-	archiveBinaire << t;
 
 	noeudServeurCentral->send(t);
 }
