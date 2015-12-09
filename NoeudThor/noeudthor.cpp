@@ -11,7 +11,8 @@ NoeudThor::NoeudThor(boost::asio::io_service &io_service, int portecoute, networ
 {
 	cout << "Construction d'un noeudThor" << std::endl;
 	srand(time(NULL));
-	startConnect();
+	startConnectServeurCentral();
+	startConnectSecureNodeListProvider();
 	startAccept();
 	giveEarPort();
 	askNeighborList();
@@ -19,13 +20,22 @@ NoeudThor::NoeudThor(boost::asio::io_service &io_service, int portecoute, networ
 }
 
 
-void NoeudThor::startConnect()
+void NoeudThor::startConnectServeurCentral()
 {
 	noeudServeurCentral = new Client<NoeudThor>(this, io_service);
 	tcp::endpoint endpoint(boost::asio::ip::address::from_string("127.0.0.1"), 8080);
 	cout << "Connection au serveur central" << std::endl;
 	noeudServeurCentral->getSocket().connect(endpoint);
 	noeudServeurCentral->startRead();
+}
+
+void NoeudThor::startConnectSecureNodeListProvider()
+{
+	noeudSecureNodeListProvider = new Client<NoeudThor>(this, io_service);
+	tcp::endpoint endpoint(boost::asio::ip::address::from_string("127.0.0.1"), 8081);
+	cout << "Connection au Secure Node List Provider" << std::endl;
+	noeudSecureNodeListProvider->getSocket().connect(endpoint);
+	noeudSecureNodeListProvider->startRead();
 }
 
 void NoeudThor::giveEarPort(){
@@ -40,7 +50,7 @@ void NoeudThor::giveEarPort(){
 	boost::archive::binary_oarchive archiveBinaire(os);
 	archiveBinaire << t;
 
-	noeudServeurCentral->send(t);
+	noeudSecureNodeListProvider->send(t);
 }
 
 void NoeudThor::askNeighborList(){
@@ -55,7 +65,7 @@ void NoeudThor::askNeighborList(){
 	boost::archive::binary_oarchive archiveBinaire(os);
 	archiveBinaire << t;
 
-	noeudServeurCentral->send(t);
+	noeudSecureNodeListProvider->send(t);
 }
 
 
@@ -67,13 +77,17 @@ void NoeudThor::askNombreNoeuds(){
 			"Commande : " << t.getCommande() << std::endl <<
 			"*********/" << std::endl;
 
-	noeudServeurCentral->send(t);
+	noeudSecureNodeListProvider->send(t);
 }
 
 void NoeudThor::clientLeave(Client<NoeudThor> *leaving)
 {
 	if (leaving == noeudServeurCentral){
 		cout << "Le serveur central s'est arreté" << std::endl;
+		exit(-1);
+	}
+	else if (leaving == noeudSecureNodeListProvider){
+		cout << "Le Secure Node List Provider s'est arreté" << std::endl;
 		exit(-1);
 	}
 	auto i = std::begin(this->toutlemonde);
@@ -98,12 +112,8 @@ void NoeudThor::startAccept()
 
 void NoeudThor::traitementDeLaTrame(Trame &t, Client<NoeudThor> *noeudSource)
 {
-	if (noeudSource == this->noeudServeurCentral){
+	if (noeudSource == noeudSecureNodeListProvider){
 		switch (t.getTTL()) {
-			case -1:
-			{
-				break;
-			}
 			case -2:
 			{
 				cout << "On a recu la liste d'ip:portd'écoute des autres clients" << std::endl;
@@ -144,13 +154,17 @@ void NoeudThor::traitementDeLaTrame(Trame &t, Client<NoeudThor> *noeudSource)
 				cout << "Il y a " << nombre << "noeuds sur le réseau." << std::endl;
 				break;
 			}
+			default:
+			{
+				break;
+			}
+		}
+	}
+	else if(noeudSource == noeudServeurCentral){
+		switch (t.getTTL()) {
 			case 0:
 			{
 				//observeur->tor_recieve(t.getCommande());
-				break;
-			}
-			default:
-			{
 				break;
 			}
 		}

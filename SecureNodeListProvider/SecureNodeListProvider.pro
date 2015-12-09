@@ -5,11 +5,11 @@ CONFIG -= qt
 LIBS += -L/usr/lib -lboost_system -lboost_serialization
 
 SOURCES += main.cpp \
-    serveurcentral.cpp \
+    securenodelistprovider.cpp \
     trame.cpp
 
 HEADERS += \
     client.h \
-    serveurcentral.h \
+    securenodelistprovider.h \
     trame.h
 
