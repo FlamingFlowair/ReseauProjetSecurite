@@ -28,5 +28,6 @@ class NoeudThor
 		void giveEarPort();
 		void askNombreNoeuds();
 		void clientLeave(Client<NoeudThor>* leaving);
+		void send(string toSend);
 };
 #endif //NOEUDTHOR_H

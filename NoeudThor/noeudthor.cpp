@@ -10,6 +10,7 @@ NoeudThor::NoeudThor(boost::asio::io_service &io_service, int portecoute, networ
 	  observeur(observeur)
 {
 	cout << "Construction d'un noeudThor" << std::endl;
+	srand(time(NULL));
 	startConnect();
 	startAccept();
 	giveEarPort();
@@ -149,7 +150,7 @@ void NoeudThor::traitementDeLaTrame(Trame &t, Client<NoeudThor> *noeudSource)
 			}
 			case 0:
 			{
-				observeur->tor_recieve(t.getCommande());
+				//observeur->tor_recieve(t.getCommande());
 				break;
 			}
 			default:
@@ -168,7 +169,6 @@ void NoeudThor::traitementDeLaTrame(Trame &t, Client<NoeudThor> *noeudSource)
 			default:
 			{
 				t.setTTL(t.getTTL()-1);
-				srand(time(NULL));
 				int number = rand()%toutlemonde.size();
 				auto i = toutlemonde.begin();
 				std::advance(i, number);
@@ -188,4 +188,15 @@ void NoeudThor::handle_accept(Client<NoeudThor> *noeud, const boost::system::err
 		noeud->startRead();
 		startAccept(); // (5)
 	}
+}
+
+void NoeudThor::send(string toSend)
+{
+	std::cout << "Envoi d'une string depuis la frontale" << std::endl;
+	Trame t;
+	t.setCommande(toSend);
+	t.setTTL(rand()%toutlemonde.size());
+	auto i = toutlemonde.begin();
+	std::advance(i, rand()%toutlemonde.size());
+	(*i)->send(t);
 }
