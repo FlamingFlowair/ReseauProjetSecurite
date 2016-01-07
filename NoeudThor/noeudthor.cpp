@@ -155,9 +155,10 @@ void NoeudThor::traitementDeLaTrame(Trame &t, Client<NoeudThor> *noeudSource)
 						tcp::endpoint endpoint(boost::asio::ip::address::from_string(trucl.first), trucl.second);
 						cli->getSocket().connect(endpoint);
 						cli->startRead();
+						cli->setPort(trucl.second);
 						toutlemonde.push_front(cli);
 					}
-					cout << "IT : " << trucl.first << std::endl;
+					cout << "IP : " << trucl.first << std::endl;
 					cout << "Port : " << trucl.second << std::endl;
 				}
 				cout << "Enregistrement des différents noeuds effectué" << std::endl;
@@ -263,5 +264,6 @@ void NoeudThor::sendRep(string toSend)
 	Trame t;
 	t.setCommande(toSend);
 	t.setTTL(-1*(toutlemonde.size()+(rand()%toutlemonde.size())));
-	next->send(t);
+	if (next != NULL)
+		next->send(t);
 }
